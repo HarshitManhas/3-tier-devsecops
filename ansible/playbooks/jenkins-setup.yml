@@ -1,0 +1,78 @@
+---
+# Jenkins server verification playbook
+# Note: Jenkins is auto-installed via Terraform user_data (bootstrap-jenkins.sh)
+# This playbook verifies the installation and does post-config tasks
+
+- name: Verify and configure Jenkins server
+  hosts: jenkins
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Ensure Jenkins is running
+      systemd:
+        name: jenkins
+        state: started
+        enabled: true
+
+    - name: Ensure Docker is running
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add jenkins user to docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: true
+
+    - name: Fix docker socket permissions
+      file:
+        path: /var/run/docker.sock
+        mode: '0666'
+
+    - name: Restart Jenkins to pick up docker group
+      systemd:
+        name: jenkins
+        state: restarted
+
+    - name: Wait for Jenkins to start
+      wait_for:
+        port: 8080
+        host: localhost
+        delay: 15
+        timeout: 120
+
+    - name: Get Jenkins initial admin password
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_pass
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show Jenkins access info
+      debug:
+        msg:
+          - "======================================"
+          - "Jenkins URL: http://{{ inventory_hostname }}:8080"
+          - "Initial password: {{ jenkins_pass.stdout | default('Check /var/lib/jenkins/secrets/initialAdminPassword') }}"
+          - "======================================"
+
+    - name: Verify all tools installed
+      shell: |
+        echo "Jenkins:   $(jenkins --version 2>/dev/null || systemctl is-active jenkins)"
+        echo "Docker:    $(docker --version)"
+        echo "Terraform: $(terraform version | head -1)"
+        echo "Ansible:   $(ansible --version | head -1)"
+        echo "AWS CLI:   $(aws --version)"
+        echo "kubectl:   $(kubectl version --client --short 2>/dev/null)"
+        echo "Helm:      $(helm version --short)"
+        echo "Trivy:     $(trivy --version | head -1)"
+        echo "Gitleaks:  $(gitleaks version)"
+        echo "Node.js:   $(node --version)"
+      register: versions
+      changed_when: false
+
+    - name: Print tool versions
+      debug:
+        msg: "{{ versions.stdout_lines }}"

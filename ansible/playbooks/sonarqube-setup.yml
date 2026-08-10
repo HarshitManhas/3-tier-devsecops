@@ -1,0 +1,58 @@
+---
+# SonarQube server verification playbook
+# Note: SonarQube is auto-installed via Terraform user_data (bootstrap-sonarqube.sh)
+# This playbook verifies health and configures the project token
+
+- name: Verify and configure SonarQube server
+  hosts: sonarqube
+  become: true
+  gather_facts: true
+
+  vars:
+    sonarqube_port: 9000
+    sonarqube_url: "http://localhost:{{ sonarqube_port }}"
+
+  tasks:
+    - name: Ensure Docker is running
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Check SonarQube containers are up
+      command: docker compose -f /opt/sonarqube/docker-compose.yml ps
+      register: sonar_status
+      changed_when: false
+
+    - name: Print container status
+      debug:
+        msg: "{{ sonar_status.stdout_lines }}"
+
+    - name: Wait for SonarQube to be ready (can take 3-5 mins)
+      uri:
+        url: "{{ sonarqube_url }}/api/system/status"
+        method: GET
+        status_code: 200
+      register: sonar_health
+      until: sonar_health.json.status == 'UP'
+      retries: 30
+      delay: 15
+      ignore_errors: true
+
+    - name: SonarQube health status
+      debug:
+        msg:
+          - "===================================="
+          - "SonarQube Status: {{ sonar_health.json.status | default('NOT_READY') }}"
+          - "URL: http://{{ inventory_hostname }}:{{ sonarqube_port }}"
+          - "Login: admin / admin  (CHANGE PASSWORD!)"
+          - "===================================="
+
+    - name: Show kernel settings
+      command: sysctl vm.max_map_count
+      register: kernel_check
+      changed_when: false
+
+    - name: Print kernel settings
+      debug:
+        msg: "{{ kernel_check.stdout }}"

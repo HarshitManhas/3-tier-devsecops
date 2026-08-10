@@ -1,0 +1,49 @@
+# Gitleaks configuration for 3-tier DevSecOps project
+title = "DevOps Project Gitleaks Config"
+
+[extend]
+# Use the default ruleset
+useDefault = true
+
+[[rules]]
+description = "MySQL/DB Password"
+id = "mysql-password"
+regex = '''(?i)(db_password|mysql_password|database_password)\s*=\s*['"]?[a-zA-Z0-9!@#$%^&*]{3,}['"]?'''
+secretGroup = 0
+[rules.allowlist]
+regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{|CHANGE)''']
+
+[[rules]]
+description = "JWT Secret"
+id = "jwt-secret"
+regex = '''(?i)(jwt_secret|jwt_key)\s*=\s*['"]?.{10,}['"]?'''
+secretGroup = 0
+[rules.allowlist]
+regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{|openssl)''']
+
+[[rules]]
+description = "AWS Secret Access Key"
+id = "aws-secret-key"
+regex = '''(?i)aws_secret_access_key\s*=\s*[a-zA-Z0-9/+]{40}'''
+
+[[rules]]
+description = "Generic API Key"
+id = "generic-api-key"
+regex = '''(?i)(api_key|apikey|secret_key)\s*[=:]\s*['"]?[a-zA-Z0-9_\-]{20,}['"]?'''
+[rules.allowlist]
+regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{)''']
+
+[allowlist]
+description = "Global allowlist"
+files = [
+  '''\.env\.example$''',
+  '''package-lock\.json$''',
+  '''terraform\.tfvars\.example$''',
+  '''\.gitleaks\.toml$'''
+]
+paths = [
+  '''node_modules''',
+  '''\.git''',
+  '''coverage''',
+]
+commits = []

@@ -1,0 +1,49 @@
+# ServiceAccounts, Roles, and RoleBindings
+---
+# Frontend ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-sa
+  namespace: devops-project
+  labels:
+    app: frontend
+automountServiceAccountToken: false
+---
+# Backend ServiceAccount (with IRSA annotation for Secrets Manager)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend-sa
+  namespace: devops-project
+  labels:
+    app: backend
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/devops-project-prod-backend-sa-role  # Replace ACCOUNT_ID
+automountServiceAccountToken: true
+---
+# Role for backend to read secrets (if using k8s secrets directly)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backend-role
+  namespace: devops-project
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["db-credentials", "app-secrets"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backend-rolebinding
+  namespace: devops-project
+subjects:
+  - kind: ServiceAccount
+    name: backend-sa
+    namespace: devops-project
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: backend-role

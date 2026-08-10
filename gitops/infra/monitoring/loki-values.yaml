@@ -1,0 +1,41 @@
+# Loki Stack Helm values for centralized logging
+# helm install loki grafana/loki-stack -n monitoring -f loki-values.yaml
+
+loki:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 20Gi
+  config:
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    scrape_configs:
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_namespace]
+            action: keep
+            regex: devops-project|monitoring
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: app
+
+grafana:
+  enabled: false  # Using the one from kube-prometheus-stack
+  sidecar:
+    datasources:
+      enabled: true

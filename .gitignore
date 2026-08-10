@@ -1,0 +1,49 @@
+# Environment files - NEVER commit secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+client/build/
+client/.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Terraform state (should use remote state)
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# Trivy report
+trivy-report.json
+trivy-report.html
+
+# SonarQube
+.sonar/
+
+# Gitleaks
+gitleaks-report.json
+
+# Ansible vault passwords
+*.vault_pass
+
+# SSH keys
+*.pem
+*.key
+!*.key.example

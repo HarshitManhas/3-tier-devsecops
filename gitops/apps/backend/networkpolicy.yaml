@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-netpol
+  namespace: devops-project
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from frontend pods only
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 5000
+    # Allow from ingress (direct API access)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 5000
+  egress:
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+    # MySQL on RDS (port 3306)
+    - ports:
+        - protocol: TCP
+          port: 3306
+    # AWS Secrets Manager (HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 443

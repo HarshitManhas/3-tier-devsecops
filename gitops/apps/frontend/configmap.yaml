@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: devops-project
+data:
+  api_url: "https://api.yourdomain.com"  # Replace with your domain
