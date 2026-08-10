@@ -35,8 +35,10 @@ spec:
 
       containers:
         - name: backend
-          # IMAGE TAG IS UPDATED BY JENKINS CI PIPELINE
-          image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/devops-project-prod-backend:latest
+          # IMAGE TAG IS UPDATED AUTOMATICALLY BY JENKINS CI PIPELINE (Stage 9)
+          # Format: docker.io/YOUR_DOCKERHUB_USERNAME/devops-project-backend:GIT_SHA-BUILD_NUM
+          # Replace YOUR_DOCKERHUB_USERNAME with your actual DockerHub username
+          image: YOUR_DOCKERHUB_USERNAME/devops-project-backend:latest
           imagePullPolicy: Always
           ports:
             - name: http
