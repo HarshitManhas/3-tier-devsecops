@@ -73,28 +73,14 @@ pipeline {
                 stage('Backend Deps') {
                     steps {
                         dir('api') {
-                            sh '''
-                                if [ -f package-lock.json ]; then
-                                    npm ci
-                                else
-                                    echo "No package-lock.json found, using npm install"
-                                    npm install
-                                fi
-                            '''
+                            sh 'npm install --legacy-peer-deps'
                         }
                     }
                 }
                 stage('Frontend Deps') {
                     steps {
                         dir('client') {
-                            sh '''
-                                if [ -f package-lock.json ]; then
-                                    npm ci
-                                else
-                                    echo "No package-lock.json found, using npm install"
-                                    npm install
-                                fi
-                            '''
+                            sh 'npm install --legacy-peer-deps'
                         }
                     }
                 }
