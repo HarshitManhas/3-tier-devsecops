@@ -22,8 +22,8 @@
 
 | Repo | Description |
 |------|-------------|
-| **[3-tier-devsecops](https://github.com/YOUR_USERNAME/3-tier-devsecops)** ← You are here | App code, Jenkinsfile, Terraform, Ansible, Dockerfiles |
-| **[3-tier-devsecops-gitops](https://github.com/YOUR_USERNAME/3-tier-devsecops-gitops)** | Kubernetes manifests (watched by Argo CD) |
+| **[3-tier-devsecops](https://github.com/harshitmanhas/3-tier-devsecops)** ← You are here | App code, Jenkinsfile, Terraform, Ansible, Dockerfiles |
+| **[3-tier-devsecops-gitops](https://github.com/harshitmanhas/3-tier-devsecops-gitops)** | Kubernetes manifests (watched by Argo CD) |
 
 ---
 
@@ -44,8 +44,8 @@
 │  Stage 2: npm install (parallel) │
 │  Stage 3: Jest unit tests        │      ┌─────────────────────────────┐
 │  Stage 4: SonarQube SAST    ─────┘      │   🐋 DockerHub              │
-│  Stage 5: Trivy FS scan          │─────►│   username/frontend:tag     │
-│  Stage 6: Docker build           │      │   username/backend:tag      │
+│  Stage 5: Trivy FS scan          │─────►│   harmanhas7/frontend:tag     │
+│  Stage 6: Docker build           │      │   harmanhas7/backend:tag      │
 │  Stage 7: Trivy image scan       │      └─────────────────────────────┘
 │  Stage 8: DockerHub push    ─────┘
 │  Stage 9: GitOps update     ─────────► 🐙 GitHub (GitOps Repo)
@@ -190,7 +190,7 @@ Every `git push` passes through **5 automated security gates** before reaching p
 
 ```bash
 # 1. Clone
-git clone https://github.com/YOUR_USERNAME/3-tier-devsecops.git
+git clone https://github.com/harshitmanhas/3-tier-devsecops.git
 cd 3-tier-devsecops
 
 # 2. Set env vars
