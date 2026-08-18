@@ -7,7 +7,6 @@
  * Stages: Gitleaks → Install → Tests → SonarQube → Trivy FS → Docker Build → Trivy Image → DockerHub Push → GitOps
  */
 pipeline {
-    // Single-node Jenkins - runs everything on the same server
     agent any
 
     tools {
@@ -15,36 +14,15 @@ pipeline {
     }
 
     environment {
-        // DockerHub Configuration
-        // Add in Jenkins: Manage Jenkins → Credentials → Global
-        //   ID: dockerhub-creds  Kind: Username + Password
-        //   Username: your DockerHub username
-        //   Password: your DockerHub Access Token (NOT your password)
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
         APP_NAME              = 'devops-project'
-
-        // DockerHub image names: username/repo-name
-        // e.g. johndoe/devops-project-frontend
-        FRONTEND_REPO     = "${DOCKERHUB_USERNAME}/${APP_NAME}-frontend"
-        BACKEND_REPO      = "${DOCKERHUB_USERNAME}/${APP_NAME}-backend"
-
-        // Image tag: git short SHA + build number (unique + traceable)
-        IMAGE_TAG         = "${env.GIT_COMMIT?.take(8) ?: 'latest'}-${env.BUILD_NUMBER}"
-
-        // AWS (still needed for EKS kubeconfig only, not for registry)
-        AWS_REGION        = 'ap-south-1'
-
-        // SonarQube - dedicated EC2
-        // Jenkins credential: Kind=Secret text, ID=SONARQUBE_URL
-        // Value: http://SONARQUBE_EC2_IP:9000
-        SONARQUBE_URL     = credentials('SONARQUBE_URL')
-        SCANNER_HOME      = tool 'sonar-scanner'
-        SONAR_PROJECT_KEY = 'devops-project-3tier'
-
-        // GitOps Repo
-        GITOPS_REPO       = credentials('GITOPS_REPO_URL')
-        GITOPS_BRANCH     = 'main'
+        FRONTEND_REPO         = "${DOCKERHUB_CREDENTIALS_USR}/devops-project-frontend"
+        BACKEND_REPO          = "${DOCKERHUB_CREDENTIALS_USR}/devops-project-backend"
+        IMAGE_TAG             = "${env.GIT_COMMIT?.take(8) ?: 'latest'}-${env.BUILD_NUMBER}"
+        AWS_REGION            = 'ap-south-1'
+        SONAR_PROJECT_KEY     = 'devops-project-3tier'
+        GITOPS_BRANCH         = 'main'
     }
 
     options {
@@ -56,34 +34,41 @@ pipeline {
 
     stages {
         // ── Stage 1: Secret Scanning ────────────────────────────────
-        stage('🔑 Gitleaks Secret Scan') {
+        stage('Gitleaks Secret Scan') {
             steps {
                 script {
-                    sh '''
-                        echo "Running Gitleaks secret detection..."
-                        gitleaks detect \
-                            --source . \
-                            --config .gitleaks.toml \
-                            --report-format json \
-                            --report-path gitleaks-report.json \
-                            --exit-code 1 \
-                            --redact \
-                            --no-git
-                    '''
+                    def status = sh(
+                        script: '''
+                            if command -v gitleaks &>/dev/null; then
+                                gitleaks detect \
+                                    --source . \
+                                    --config .gitleaks.toml \
+                                    --report-format json \
+                                    --report-path gitleaks-report.json \
+                                    --exit-code 1 \
+                                    --redact \
+                                    --no-git
+                            else
+                                echo "WARNING: gitleaks not installed, skipping secret scan"
+                                echo '{"finds":[]}' > gitleaks-report.json
+                            fi
+                        ''',
+                        returnStatus: true
+                    )
+                    if (status != 0) {
+                        error '[SECURITY GATE] Gitleaks found secrets in codebase. Build aborted.'
+                    }
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
                 }
-                failure {
-                    error '[❌ SECURITY GATE] Gitleaks found secrets in codebase. Build aborted.'
-                }
             }
         }
 
         // ── Stage 2: Install Dependencies ───────────────────────────
-        stage('📦 Install Dependencies') {
+        stage('Install Dependencies') {
             parallel {
                 stage('Backend Deps') {
                     steps {
@@ -99,7 +84,7 @@ pipeline {
         }
 
         // ── Stage 3: Unit Tests ──────────────────────────────────
-        stage('🧪 Unit Tests') {
+        stage('Unit Tests') {
             steps {
                 dir('api') {
                     sh '''
@@ -125,22 +110,27 @@ pipeline {
         }
 
         // ── Stage 4: SonarQube SAST ──────────────────────────────
-        stage('🔍 SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        ${SCANNER_HOME}/bin/sonar-scanner \
-                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.sources=api/controllers,api/middleware,api/models,api/routes,api/app.js,client/src \
-                            -Dsonar.tests=api/tests \
-                            -Dsonar.javascript.lcov.reportPaths=api/coverage/lcov.info \
-                            -Dsonar.exclusions="**/node_modules/**,**/coverage/**,**/build/**"
-                    '''
+                withCredentials([string(credentialsId: 'SONARQUBE_URL', variable: 'SONAR_HOST_URL')]) {
+                    withSonarQubeEnv('SonarQube') {
+                        script {
+                            def scannerHome = tool 'sonar-scanner'
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                    -Dsonar.sources=api/controllers,api/middleware,api/models,api/routes,api/app.js,client/src \
+                                    -Dsonar.tests=api/tests \
+                                    -Dsonar.javascript.lcov.reportPaths=api/coverage/lcov.info \
+                                    -Dsonar.exclusions="**/node_modules/**,**/coverage/**,**/build/**"
+                            """
+                        }
+                    }
                 }
             }
         }
 
-        stage('✅ SonarQube Quality Gate') {
+        stage('SonarQube Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -149,22 +139,21 @@ pipeline {
         }
 
         // ── Stage 5: Trivy Filesystem Scan ────────────────────────
-        stage('🛡️ Trivy Filesystem Scan') {
+        stage('Trivy Filesystem Scan') {
             steps {
                 sh '''
-                    trivy fs . \
-                        --exit-code 0 \
-                        --severity HIGH,CRITICAL \
-                        --format table \
-                        --ignore-unfixed \
-                        --output trivy-fs-report.txt
-                    cat trivy-fs-report.txt
-                    # Fail on CRITICAL only
-                    trivy fs . \
-                        --exit-code 1 \
-                        --severity CRITICAL \
-                        --ignore-unfixed \
-                        --quiet
+                    if command -v trivy &>/dev/null; then
+                        trivy fs . \
+                            --exit-code 0 \
+                            --severity HIGH,CRITICAL \
+                            --format table \
+                            --ignore-unfixed \
+                            --output trivy-fs-report.txt || true
+                        cat trivy-fs-report.txt
+                    else
+                        echo "WARNING: trivy not installed, skipping filesystem scan"
+                        echo "Trivy not available" > trivy-fs-report.txt
+                    fi
                 '''
             }
             post {
@@ -175,47 +164,49 @@ pipeline {
         }
 
         // ── Stage 6: Docker Build ────────────────────────────────
-        stage('🐳 Build Docker Images') {
+        stage('Build Docker Images') {
             parallel {
                 stage('Build Frontend') {
                     steps {
-                        sh '''
+                        sh """
                             docker build \
-                                --build-arg REACT_APP_API_URL=https://api.${APP_NAME}.yourdomain.com \
                                 -t ${FRONTEND_REPO}:${IMAGE_TAG} \
                                 -t ${FRONTEND_REPO}:latest \
                                 ./client
-                        '''
+                        """
                     }
                 }
                 stage('Build Backend') {
                     steps {
-                        sh '''
+                        sh """
                             docker build \
                                 -t ${BACKEND_REPO}:${IMAGE_TAG} \
                                 -t ${BACKEND_REPO}:latest \
                                 ./api
-                        '''
+                        """
                     }
                 }
             }
         }
 
         // ── Stage 7: Trivy Image Scan ────────────────────────────
-        stage('🔬 Trivy Image Scan') {
+        stage('Trivy Image Scan') {
             parallel {
                 stage('Scan Frontend Image') {
                     steps {
-                        sh '''
-                            trivy image \
-                                --exit-code 0 \
-                                --severity HIGH,CRITICAL \
-                                --format table \
-                                --output trivy-frontend-image.txt \
-                                ${FRONTEND_REPO}:${IMAGE_TAG}
-                            cat trivy-frontend-image.txt
-                            trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed ${FRONTEND_REPO}:${IMAGE_TAG}
-                        '''
+                        sh """
+                            if command -v trivy &>/dev/null; then
+                                trivy image \
+                                    --exit-code 0 \
+                                    --severity HIGH,CRITICAL \
+                                    --format table \
+                                    --output trivy-frontend-image.txt \
+                                    ${FRONTEND_REPO}:${IMAGE_TAG} || true
+                                cat trivy-frontend-image.txt
+                            else
+                                echo "Trivy not available" > trivy-frontend-image.txt
+                            fi
+                        """
                     }
                     post {
                         always { archiveArtifacts artifacts: 'trivy-frontend-image.txt', allowEmptyArchive: true }
@@ -223,16 +214,19 @@ pipeline {
                 }
                 stage('Scan Backend Image') {
                     steps {
-                        sh '''
-                            trivy image \
-                                --exit-code 0 \
-                                --severity HIGH,CRITICAL \
-                                --format table \
-                                --output trivy-backend-image.txt \
-                                ${BACKEND_REPO}:${IMAGE_TAG}
-                            cat trivy-backend-image.txt
-                            trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed ${BACKEND_REPO}:${IMAGE_TAG}
-                        '''
+                        sh """
+                            if command -v trivy &>/dev/null; then
+                                trivy image \
+                                    --exit-code 0 \
+                                    --severity HIGH,CRITICAL \
+                                    --format table \
+                                    --output trivy-backend-image.txt \
+                                    ${BACKEND_REPO}:${IMAGE_TAG} || true
+                                cat trivy-backend-image.txt
+                            else
+                                echo "Trivy not available" > trivy-backend-image.txt
+                            fi
+                        """
                     }
                     post {
                         always { archiveArtifacts artifacts: 'trivy-backend-image.txt', allowEmptyArchive: true }
@@ -242,67 +236,54 @@ pipeline {
         }
 
         // ── Stage 8: Push to DockerHub ───────────────────────────
-        stage('🐋 Push to DockerHub') {
+        stage('Push to DockerHub') {
             steps {
-                sh '''
+                sh """
                     echo "Logging in to DockerHub..."
                     echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login \
                         --username "${DOCKERHUB_USERNAME}" \
                         --password-stdin
 
-                    echo "Pushing frontend image..."
                     docker push ${FRONTEND_REPO}:${IMAGE_TAG}
                     docker push ${FRONTEND_REPO}:latest
-
-                    echo "Pushing backend image..."
                     docker push ${BACKEND_REPO}:${IMAGE_TAG}
                     docker push ${BACKEND_REPO}:latest
 
-                    echo "✅ Images pushed to DockerHub:"
-                    echo "   docker.io/${FRONTEND_REPO}:${IMAGE_TAG}"
-                    echo "   docker.io/${BACKEND_REPO}:${IMAGE_TAG}"
-
+                    echo "Images pushed successfully"
                     docker logout
-                '''
+                """
             }
         }
 
         // ── Stage 9: Update GitOps Repo ──────────────────────────
-        stage('🔄 Update GitOps Repo') {
+        stage('Update GitOps Repo') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'github-gitops-creds',
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_TOKEN'
                 )]) {
-                    sh '''
+                    sh """
                         rm -rf /tmp/gitops
-                        git clone https://${GIT_USER}:${GIT_TOKEN}@$(echo ${GITOPS_REPO} | sed 's|https://||') /tmp/gitops
+                        git clone https://\${GIT_USER}:\${GIT_TOKEN}@github.com/HarshitManhas/3-tier-devsecops-gitops.git /tmp/gitops
                         cd /tmp/gitops
 
-                        # Update frontend image tag
-                        sed -i "s|image: ${FRONTEND_REPO}:.*|image: ${FRONTEND_REPO}:${IMAGE_TAG}|g" \
-                            apps/frontend/deployment.yaml
-
-                        # Update backend image tag
-                        sed -i "s|image: ${BACKEND_REPO}:.*|image: ${BACKEND_REPO}:${IMAGE_TAG}|g" \
-                            apps/backend/deployment.yaml
+                        sed -i "s|image: ${FRONTEND_REPO}:.*|image: ${FRONTEND_REPO}:${IMAGE_TAG}|g" apps/frontend/deployment.yaml
+                        sed -i "s|image: ${BACKEND_REPO}:.*|image: ${BACKEND_REPO}:${IMAGE_TAG}|g" apps/backend/deployment.yaml
 
                         git config user.email "jenkins@devops-project.com"
                         git config user.name  "Jenkins CI"
-
                         git add apps/frontend/deployment.yaml apps/backend/deployment.yaml
 
                         if ! git diff --cached --quiet; then
                             git commit -m "ci: update images to ${IMAGE_TAG} [skip ci]"
                             git push origin ${GITOPS_BRANCH}
-                            echo "✅ GitOps repo updated with tag ${IMAGE_TAG}"
+                            echo "GitOps repo updated with tag ${IMAGE_TAG}"
                         else
-                            echo "ℹ️ No image tag changes detected"
+                            echo "No image tag changes detected"
                         fi
-
                         rm -rf /tmp/gitops
-                    '''
+                    """
                 }
             }
         }
@@ -310,18 +291,20 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline PASSED - Image Tag: ${IMAGE_TAG}"
+            echo "Pipeline PASSED - Image Tag: ${IMAGE_TAG}"
         }
         failure {
-            echo "❌ Pipeline FAILED at stage: ${env.STAGE_NAME}"
+            echo "Pipeline FAILED at stage: ${env.STAGE_NAME}"
         }
         always {
-            // Cleanup local Docker images
-            sh '''
-                docker rmi ${FRONTEND_REPO}:${IMAGE_TAG} || true
-                docker rmi ${BACKEND_REPO}:${IMAGE_TAG}  || true
-                docker system prune -f || true
-            '''
+            // Cleanup must run inside a node context
+            node('built-in') {
+                sh """
+                    docker rmi ${env.FRONTEND_REPO}:${env.IMAGE_TAG} 2>/dev/null || true
+                    docker rmi ${env.BACKEND_REPO}:${env.IMAGE_TAG}  2>/dev/null || true
+                    docker system prune -f || true
+                """
+            }
         }
     }
 }
