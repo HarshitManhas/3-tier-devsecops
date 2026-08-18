@@ -49,6 +49,15 @@ Deployment is handled via the GitOps methodology using **ArgoCD**.
 *   When Jenkins updates the image tags in the GitOps repository, ArgoCD automatically detects the drift and syncs the changes to the EKS cluster.
 *   This ensures the EKS cluster state always matches the declared state in Git.
 
+## 📊 Monitoring & Observability
+
+![Grafana Dashboard](<add Grafana dashboard screenshot here>)
+
+The cluster and application are monitored using the **Kube-Prometheus-Stack** (deployed via Helm):
+*   **Prometheus**: Scrapes and stores time-series metrics from the EKS cluster, worker nodes, and application pods.
+*   **Grafana**: Provides data visualization and pre-built Kubernetes dashboards to monitor CPU, memory, network, and pod health.
+*   **Alertmanager**: Configured to handle alerts for critical cluster events.
+
 ## 🛠️ Application Structure
 
 *   `client/`: React frontend application.
@@ -90,6 +99,10 @@ Deployment is handled via the GitOps methodology using **ArgoCD**.
     *   Trigger a build in Jenkins.
     *   Monitor the pipeline stages.
     *   Once complete, verify the application deployment in ArgoCD and access the frontend.
+5.  **Configure Monitoring**:
+    *   Deploy the `kube-prometheus-stack` via Helm.
+    *   Expose the Grafana service as a LoadBalancer.
+    *   Log in to Grafana to view real-time cluster metrics.
 
 ## 🧹 Cleanup
 
