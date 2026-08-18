@@ -16,14 +16,16 @@ const pool = mysql.createPool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : undefined,
 });
 
-// Test connectivity on startup
-pool.getConnection((err, conn) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err.message);
-    process.exit(1);
-  }
-  console.log('✅ MySQL connected successfully');
-  conn.release();
-});
+// Test connectivity on startup (skip in test environment)
+if (process.env.NODE_ENV !== 'test') {
+  pool.getConnection((err, conn) => {
+    if (err) {
+      console.error('❌ Database connection failed:', err.message);
+    } else {
+      console.log('✅ MySQL connected successfully');
+      conn.release();
+    }
+  });
+}
 
 module.exports = pool;

@@ -101,14 +101,7 @@ pipeline {
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'api/junit.xml'
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'api/coverage/lcov-report',
-                        reportFiles: 'index.html',
-                        reportName: 'Coverage Report'
-                    ])
+                    archiveArtifacts artifacts: 'api/coverage/**', allowEmptyArchive: true
                 }
             }
         }
