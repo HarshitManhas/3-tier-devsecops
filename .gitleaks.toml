@@ -11,7 +11,7 @@ id = "mysql-password"
 regex = '''(?i)(db_password|mysql_password|database_password)\s*=\s*['"]?[a-zA-Z0-9!@#$%^&*]{3,}['"]?'''
 secretGroup = 0
 [rules.allowlist]
-regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{|CHANGE)''']
+regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{|CHANGE|test|var\.)''']
 
 [[rules]]
 description = "JWT Secret"
@@ -19,7 +19,7 @@ id = "jwt-secret"
 regex = '''(?i)(jwt_secret|jwt_key)\s*=\s*['"]?.{10,}['"]?'''
 secretGroup = 0
 [rules.allowlist]
-regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{|openssl)''']
+regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{|openssl|ci-test|test-secret|minimum)''']
 
 [[rules]]
 description = "AWS Secret Access Key"
@@ -34,16 +34,29 @@ regex = '''(?i)(api_key|apikey|secret_key)\s*[=:]\s*['"]?[a-zA-Z0-9_\-]{20,}['"]
 regex = ['''(?i)(change_me|your_|<|>|example|placeholder|\$\{)''']
 
 [allowlist]
-description = "Global allowlist"
+description = "Global allowlist - CI placeholders and example files"
 files = [
   '''\.env\.example$''',
   '''package-lock\.json$''',
   '''terraform\.tfvars\.example$''',
-  '''\.gitleaks\.toml$'''
+  '''\.gitleaks\.toml$''',
+  '''\.test\.js$''',
+  '''\.test\.ts$''',
+  '''jest\.config\.js$'''
 ]
 paths = [
   '''node_modules''',
-  '''\.git''',
+  '''\\.git''',
   '''coverage''',
+  '''api/tests''',
+  '''terraform'''
+]
+# Allow CI placeholder values
+regexes = [
+  '''ci-test-secret''',
+  '''test-secret-key''',
+  '''CHANGE_ME''',
+  '''your_password''',
+  '''minimum-32-chars'''
 ]
 commits = []

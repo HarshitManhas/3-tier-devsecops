@@ -300,9 +300,10 @@ pipeline {
             // Cleanup must run inside a node context
             node('built-in') {
                 sh """
-                    docker rmi ${env.FRONTEND_REPO}:${env.IMAGE_TAG} 2>/dev/null || true
-                    docker rmi ${env.BACKEND_REPO}:${env.IMAGE_TAG}  2>/dev/null || true
-                    docker system prune -f || true
+                    export PATH=\$PATH:/usr/bin:/usr/local/bin
+                    /usr/bin/docker rmi ${env.FRONTEND_REPO}:${env.IMAGE_TAG} 2>/dev/null || true
+                    /usr/bin/docker rmi ${env.BACKEND_REPO}:${env.IMAGE_TAG}  2>/dev/null || true
+                    /usr/bin/docker system prune -f 2>/dev/null || true
                 """
             }
         }
