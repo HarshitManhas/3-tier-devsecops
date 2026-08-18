@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Cache dependencies separately
 COPY package.json package-lock.json* ./
-RUN npm ci --ignore-scripts
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 # Copy source and build
 COPY . .

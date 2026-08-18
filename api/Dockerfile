@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install only production dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production --ignore-scripts && \
+RUN npm install --legacy-peer-deps --ignore-scripts && \
     npm cache clean --force
 
 # ── Stage 2: Production Image ────────────────────────────────────
