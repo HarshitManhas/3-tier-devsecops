@@ -13,7 +13,7 @@ const pool = mysql.createPool({
   queueLimit:         0,
   enableKeepAlive:    true,
   keepAliveInitialDelay: 0,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : undefined,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
 // Test connectivity on startup (skip in test environment)
