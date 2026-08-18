@@ -72,12 +72,30 @@ pipeline {
             parallel {
                 stage('Backend Deps') {
                     steps {
-                        dir('api') { sh 'npm ci' }
+                        dir('api') {
+                            sh '''
+                                if [ -f package-lock.json ]; then
+                                    npm ci
+                                else
+                                    echo "No package-lock.json found, using npm install"
+                                    npm install
+                                fi
+                            '''
+                        }
                     }
                 }
                 stage('Frontend Deps') {
                     steps {
-                        dir('client') { sh 'npm ci' }
+                        dir('client') {
+                            sh '''
+                                if [ -f package-lock.json ]; then
+                                    npm ci
+                                else
+                                    echo "No package-lock.json found, using npm install"
+                                    npm install
+                                fi
+                            '''
+                        }
                     }
                 }
             }
