@@ -265,8 +265,8 @@ pipeline {
                         git clone https://\${GIT_USER}:\${GIT_TOKEN}@github.com/HarshitManhas/3-tier-devsecops-gitops.git /tmp/gitops
                         cd /tmp/gitops
 
-                        sed -i "s|image: ${FRONTEND_REPO}:.*|image: ${FRONTEND_REPO}:${IMAGE_TAG}|g" apps/frontend/deployment.yaml
-                        sed -i "s|image: ${BACKEND_REPO}:.*|image: ${BACKEND_REPO}:${IMAGE_TAG}|g" apps/backend/deployment.yaml
+                        sed -i "s|image: .*|image: ${FRONTEND_REPO}:${IMAGE_TAG}|g" apps/frontend/deployment.yaml
+                        sed -i "s|image: .*|image: ${BACKEND_REPO}:${IMAGE_TAG}|g" apps/backend/deployment.yaml
 
                         git config user.email "jenkins@devops-project.com"
                         git config user.name  "Jenkins CI"
